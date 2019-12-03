@@ -2,7 +2,11 @@ package ignition
 
 import (
 	"github.com/coreos/ignition/config/v2_1/types"
+	// "github.com/coreos/ignition/config/v2_1/types/path"
+	"github.com/coreos/ignition/config/shared/errors"
+	"github.com/coreos/ignition/config/validate/report"
 	"github.com/hashicorp/terraform/helper/schema"
+	"path"
 )
 
 func dataSourceLink() *schema.Resource {
@@ -80,5 +84,26 @@ func buildLink(d *schema.ResourceData, c *cache) (string, error) {
 		link.Group = types.NodeGroup{ID: &gid}
 	}
 
-	return c.addLink(link), handleReport(link.Validate())
+	return c.addLink(link), handleReport(ValidateTarget(link))
+}
+
+func ValidateTarget(s *types.Link) report.Report {
+	r := report.Report{}
+	if !s.Hard {
+		err := validatePath(s.Target)
+		if err != nil {
+			r.Add(report.Entry{
+				Message: err.Error(),
+				Kind:    report.EntryError,
+			})
+		}
+	}
+	return r
+}
+
+func validatePath(p string) error {
+	if !path.IsAbs(p) {
+		return errors.ErrPathRelative
+	}
+	return nil
 }
